@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reset Password | Secure Auth</title>
+<script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="style.css">
+<script src="config.js"></script><script src="common.js"></script>
+</head>
+<body class="bg-slate-50 flex items-center justify-center min-h-screen p-4">
+<div class="bg-white shadow-xl rounded-2xl w-full max-w-md p-8">
+  <div id="s1">
+    <h2 class="text-2xl font-bold text-slate-800 mb-2">Forgot Password?</h2>
+    <p class="text-slate-500 mb-6">Enter your email to receive a reset code.</p>
+    <form id="a" class="space-y-4">
+      <input class="inp" type="email" id="email" placeholder="Email Address" autocomplete="email" required>
+      <button class="btn" type="submit">Send Code</button>
+    </form>
+  </div>
+  <div id="s2" class="hidden">
+    <h2 class="text-2xl font-bold text-slate-800 mb-2">New Password</h2>
+    <p class="text-slate-500 mb-6">Enter the code and your new password.</p>
+    <form id="b" class="space-y-4">
+      <input class="inp text-center text-2xl font-bold" style="letter-spacing:.5em" id="otp" maxlength="6" inputmode="numeric"
+             autocomplete="one-time-code" placeholder="••••••" required>
+      <input class="inp" type="password" id="pw" placeholder="New Password (min 8 characters)" minlength="8" autocomplete="new-password" required>
+      <button class="btn" type="submit">Update Password</button>
+    </form>
+  </div>
+  <p id="msg"></p>
+  <p class="mt-4 text-center"><a href="login.html" class="text-sm text-slate-500 hover:text-blue-600">← Back to signin</a></p>
+</div>
+<script>
+let mail = '';
+a.onsubmit = async e => {
+  e.preventDefault(); const btn = a.querySelector('button'); Auth.busy(btn, true, 'Send Code');
+  mail = email.value.trim().toLowerCase();
+  const r = await Auth.api('/api/auth/forgot/request', { method: 'POST', auth: false, body: { email: mail } });
+  Auth.busy(btn, false, 'Send Code');
+  if (!r.ok) return Auth.show(r.message || 'Request failed');
+  s1.classList.add('hidden'); s2.classList.remove('hidden'); Auth.show(r.message, true); otp.focus();
+};
+b.onsubmit = async e => {
+  e.preventDefault(); const btn = b.querySelector('button'); Auth.busy(btn, true, 'Update Password');
+  const r = await Auth.api('/api/auth/forgot/reset', { method: 'POST', auth: false,
+    body: { email: mail, otp: otp.value.trim(), password: pw.value } });
+  Auth.busy(btn, false, 'Update Password');
+  if (!r.ok) return Auth.show(r.message || 'Reset failed');
+  Auth.Session.clear();
+  Auth.show('Password changed! Redirecting to sign in…', true);
+  setTimeout(() => location.href = 'login.html', 900);
+};
+</script>
+</body></html>

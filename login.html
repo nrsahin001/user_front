@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in | Secure Auth</title>
+<script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="style.css">
+<script src="config.js"></script><script src="common.js"></script>
+</head>
+<body class="bg-slate-50 flex items-center justify-center min-h-screen p-4">
+<div class="bg-white shadow-xl rounded-2xl w-full max-w-md p-8">
+  <h2 class="text-3xl font-extrabold text-slate-800 mb-2 text-center">Welcome Back</h2>
+  <p class="text-slate-500 mb-8 text-center">Please enter your details.</p>
+  <form id="f" class="space-y-4">
+    <input class="inp" type="email" id="email" placeholder="Email Address" autocomplete="email" required>
+    <input class="inp" type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+    <div class="text-right"><a href="forgot.html" class="text-sm text-blue-600 hover:underline">Forgot Password?</a></div>
+    <button class="btn" type="submit">Sign in</button>
+  </form>
+  <p id="msg"></p>
+  <p class="mt-6 text-center text-sm text-slate-600">New here? <a id="signupLink" href="signup.html" class="text-blue-600 font-semibold">Sign Up</a></p>
+</div>
+<script>
+const next = Auth.safeNext(new URLSearchParams(location.search).get('next'));
+if (next) document.getElementById('signupLink').href = 'signup.html?next=' + encodeURIComponent(next);
+if (Auth.Session.get()) location.replace(next || 'dashboard.html');
+
+document.getElementById('f').onsubmit = async e => {
+  e.preventDefault();
+  const b = e.target.querySelector('button');
+  Auth.busy(b, true, 'Sign in');
+  const r = await Auth.api('/api/auth/login', { method: 'POST', auth: false,
+    body: { email: email.value, password: password.value } });
+  if (r.ok) { Auth.Session.set(r.token, r.expires_at); location.href = next || 'dashboard.html'; return; }
+  Auth.busy(b, false, 'Sign in');
+  Auth.show(r.message || 'Sign in failed');
+};
+</script>
+</body></html>

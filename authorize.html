@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Authorize app | Secure Auth</title>
+<script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="style.css">
+<script src="config.js"></script><script src="common.js"></script>
+</head>
+<body class="bg-slate-50 flex items-center justify-center min-h-screen p-4">
+<div class="bg-white shadow-xl rounded-2xl w-full max-w-md p-8">
+  <p id="loading" class="text-center text-slate-500">Checking the request…</p>
+
+  <div id="consent" class="hidden">
+    <span id="badge" class="inline-block text-xs font-semibold rounded-full px-2 py-1 mb-3"></span>
+    <h2 class="text-2xl font-bold text-slate-800"><span id="appName"></span> wants access to your account</h2>
+    <p class="text-sm text-slate-500 mt-1">by <span id="devOrg" class="font-semibold text-slate-700"></span>
+      <span id="devCountry"></span></p>
+    <p id="appDesc" class="text-sm text-slate-600 mt-3"></p>
+    <p class="font-semibold text-slate-800 mt-5 mb-2 text-sm">This app will be able to see:</p>
+    <ul id="scopes" class="space-y-2 mb-5"></ul>
+    <p class="text-xs text-slate-500 mb-5">Read how they use your data:
+      <a id="privacy" class="text-blue-600 underline" target="_blank" rel="noopener noreferrer">privacy policy</a>
+      <span id="siteWrap"> · <a id="site" class="text-blue-600 underline" target="_blank" rel="noopener noreferrer">website</a></span></p>
+    <div class="space-y-3">
+      <button id="allow" class="btn">Allow</button>
+      <button id="deny" class="btn-alt">Deny</button>
+    </div>
+    <p class="text-xs text-slate-400 mt-4 text-center">Signed in as <span id="who"></span> ·
+      <a href="#" id="switch" class="underline">not you?</a><br>Your password is never shared with the app.</p>
+  </div>
+  <p id="msg"></p>
+</div>
+<script>
+const qs = location.search;
+const $ = id => document.getElementById(id);
+const fatal = m => { $('loading').classList.add('hidden'); $('consent').classList.add('hidden'); Auth.show(m || 'This request could not be completed.'); };
+const ok_target = u => typeof u === 'string' && /^(https?:\/\/|[a-z][a-z0-9+.-]*\.[a-z0-9+.-]+:)/i.test(u);
+
+async function decide(allow) {
+  $('allow').disabled = $('deny').disabled = true;
+  const r = await Auth.api('/api/oauth/decision', { method: 'POST', query: qs, body: { allow } });
+  if (r.ok && ok_target(r.redirect)) { location.href = r.redirect; return; }
+  fatal(r.message);
+}
+
+function render(r) {
+  $('appName').textContent = r.client.name;
+  $('devOrg').textContent = r.developer.organization;
+  $('devCountry').textContent = r.developer.country ? '(' + r.developer.country + ')' : '';
+  $('appDesc').textContent = r.client.description || '';
+  $('who').textContent = r.user.email;
+  const badge = $('badge');
+  if (r.client.reviewed) { badge.textContent = '✓ Reviewed app'; badge.className += ' bg-green-100 text-green-700'; }
+  else { badge.textContent = '⚠ Testing — not reviewed yet'; badge.className += ' bg-amber-100 text-amber-700'; }
+  const privacy = Auth.safeHref(r.client.privacy_policy_url), site = Auth.safeHref(r.client.homepage_url || r.developer.website);
+  if (privacy) $('privacy').href = privacy; else $('privacy').removeAttribute('href');
+  if (site) $('site').href = site; else $('siteWrap').classList.add('hidden');
+  r.scopes.forEach(s => {
+    const li = document.createElement('li');
+    li.className = 'flex items-start gap-2 text-sm text-slate-700';
+    const tick = document.createElement('span'); tick.className = 'text-green-600 font-bold'; tick.textContent = '✓';
+    const t = document.createElement('span'); t.textContent = s.label;
+    li.append(tick, t); $('scopes').appendChild(li);
+  });
+  $('allow').onclick = () => decide(true);
+  $('deny').onclick = () => decide(false);
+  $('switch').onclick = async e => { e.preventDefault(); await Auth.api('/api/auth/logout', { method: 'POST' }); Auth.Session.clear(); Auth.goLogin('authorize.html' + qs); };
+  $('loading').classList.add('hidden'); $('consent').classList.remove('hidden');
+}
+
+(async () => {
+  if (!qs) return fatal('Missing authorization request.');
+  if (!Auth.Session.get()) return Auth.goLogin('authorize.html' + qs);
+  const r = await Auth.api('/api/oauth/prepare', { method: 'POST', query: qs });
+  if (r.status === 401) { Auth.Session.clear(); return Auth.goLogin('authorize.html' + qs); }
+  if (!r.ok) return fatal(r.message);
+  if (r.auto) return decide(true);          // already approved earlier, or one of your own apps
+  render(r);
+})();
+</script>
+</body></html>
